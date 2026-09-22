@@ -174,9 +174,11 @@ export const BloodService = {
   ): Promise<BloodRequest> => {
     if (!supabase) throw new Error("Supabase not configured");
 
+    const reqId = `#BH${Date.now().toString().slice(-6)}`;
     const { data, error } = await supabase
       .from("blood_requests")
       .insert({
+        id: reqId,
         requester_id: userId,
         patient_name: request.patientName,
         blood_group: request.bloodGroup,

@@ -175,12 +175,44 @@ ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.blood_inventory ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.blood_requests ENABLE ROW LEVEL SECURITY;
 
--- Profiles: Public can view donors, users can update their own
+-- Profiles: Public can view donors, users can insert and update their own
 CREATE POLICY "Public profiles are viewable by everyone" 
 ON public.profiles FOR SELECT USING (true);
 
+CREATE POLICY "Users can insert own profile" 
+ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
+
 CREATE POLICY "Users can update own profile" 
 ON public.profiles FOR UPDATE USING (auth.uid() = id);
+
+-- Trigger to automatically create profile row from auth user metadata
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.profiles (id, full_name, email, phone, blood_group, city, state, role)
+  VALUES (
+    new.id,
+    COALESCE(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
+    new.email,
+    COALESCE(new.raw_user_meta_data->>'phone', ''),
+    (CASE WHEN new.raw_user_meta_data->>'blood_group' IN ('A+','A-','B+','B-','O+','O-','AB+','AB-') 
+          THEN (new.raw_user_meta_data->>'blood_group')::blood_group_type 
+          ELSE NULL END),
+    COALESCE(new.raw_user_meta_data->>'city', 'Nagpur'),
+    COALESCE(new.raw_user_meta_data->>'state', 'Maharashtra'),
+    COALESCE(new.raw_user_meta_data->>'role', 'recipient')
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    full_name = EXCLUDED.full_name,
+    email = EXCLUDED.email;
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- Organizations: Everyone can view verified organizations
 CREATE POLICY "Organizations are viewable by everyone" 

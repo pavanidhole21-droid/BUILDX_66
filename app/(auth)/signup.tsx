@@ -99,8 +99,9 @@ export default function SignupScreen() {
 
     if (error) {
       Alert.alert("Sign Up Failed", error);
+    } else {
+      router.replace("/(user)/home");
     }
-    // On success, AuthGuard in _layout.tsx redirects to home automatically
   };
 
   const handleSignup = () => {

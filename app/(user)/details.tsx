@@ -10,6 +10,7 @@ import { ALL_BLOOD_GROUPS } from '@/types/blood';
 import { Organization } from '@/types/organization';
 import { OrganizationService } from '@/services/api/organizationService';
 import Button from '@/components/ui/Button';
+import { useSavedOrganizations } from '@/hooks/useSavedOrganizations';
 
 export default function OrganizationDetailsScreen() {
   const router = useRouter();
@@ -43,6 +44,9 @@ export default function OrganizationDetailsScreen() {
     );
   }
 
+  const { isSaved, toggleSave } = useSavedOrganizations();
+  const saved = isSaved(org.id);
+
   const handleCall = () => {
     const phoneToCall = org.phone || Config.emergencyHelpline;
     Alert.alert('Confirm Availability', `Call ${org.name} at ${phoneToCall}?`, [
@@ -65,7 +69,17 @@ export default function OrganizationDetailsScreen() {
           <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Organization Details</Text>
-        <View style={{ width: 40 }} />
+        <TouchableOpacity
+          onPress={() => toggleSave(org.id)}
+          style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}
+          activeOpacity={0.7}
+        >
+          <Ionicons
+            name={saved ? "heart" : "heart-outline"}
+            size={24}
+            color={saved ? Colors.primary.DEFAULT : Colors.text.primary}
+          />
+        </TouchableOpacity>
       </View>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Banner */}

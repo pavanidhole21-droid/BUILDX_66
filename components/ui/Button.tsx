@@ -7,6 +7,7 @@ import {
   ViewStyle,
   TextStyle,
   View,
+  Platform,
 } from "react-native";
 import Colors from "@/constants/colors";
 
@@ -156,6 +157,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
+    ...(Platform.OS === "web"
+      ? ({ cursor: "pointer", userSelect: "none" } as any)
+      : {}),
   },
   contentRow: {
     flexDirection: "row",

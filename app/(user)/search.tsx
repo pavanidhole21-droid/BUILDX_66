@@ -22,10 +22,10 @@ import {
   BloodService,
   RankedOrganizationResult,
 } from "@/services/api/bloodService";
+import { useSavedOrganizations } from "@/hooks/useSavedOrganizations";
 import Header from "@/components/common/Header";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
-import BottomTabBar from "@/components/common/BottomTabBar";
 
 export default function SearchScreen() {
   const router = useRouter();
@@ -37,6 +37,7 @@ export default function SearchScreen() {
   const [hasSearched, setHasSearched] = useState(true);
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
   const [selectedOrgIndex, setSelectedOrgIndex] = useState(0);
+  const { isSaved, toggleSave } = useSavedOrganizations();
 
   // Filters
   const [filterDistance, setFilterDistance] = useState<number | null>(null);
@@ -270,9 +271,22 @@ export default function SearchScreen() {
                       </View>
                     </View>
 
-                    {org.isVerified && (
-                      <Badge label="Verified" variant="verified" />
-                    )}
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      {org.isVerified && (
+                        <Badge label="Verified" variant="verified" />
+                      )}
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => toggleSave(org.id)}
+                        style={{ padding: 4 }}
+                      >
+                        <Ionicons
+                          name={isSaved(org.id) ? "heart" : "heart-outline"}
+                          size={22}
+                          color={isSaved(org.id) ? "#DC2626" : "#94A3B8"}
+                        />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </TouchableOpacity>
 
@@ -537,8 +551,6 @@ export default function SearchScreen() {
           </View>
         </View>
       </Modal>
-
-      <BottomTabBar activeTab="explore" />
     </SafeAreaView>
   );
 }

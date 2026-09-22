@@ -9,7 +9,6 @@ import { BloodRequest, RequestStatus } from '@/types/blood';
 import { BloodService } from '@/services/api/bloodService';
 import Header from '@/components/common/Header';
 import Badge from '@/components/ui/Badge';
-import BottomTabBar from '@/components/common/BottomTabBar';
 import { useAuth } from '@/lib/AuthContext';
 
 type TabFilter = 'All' | 'Pending' | 'Accepted' | 'Completed';
@@ -84,7 +83,6 @@ export default function MyRequestsScreen() {
           )}
         </ScrollView>
       )}
-      <BottomTabBar activeTab="requests" />
     </SafeAreaView>
   );
 }

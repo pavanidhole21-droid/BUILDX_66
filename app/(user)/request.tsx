@@ -16,15 +16,15 @@ import Button from '@/components/ui/Button';
 export default function RequestBloodScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ orgId?: string; orgName?: string; bloodGroup?: BloodGroup; units?: string; isEmergency?: string; }>();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   const [patientName, setPatientName] = useState('');
   const [selectedGroup, setSelectedGroup] = useState<BloodGroup>((params.bloodGroup as BloodGroup) || 'O+');
   const [units, setUnits] = useState(params.units ? parseInt(params.units, 10) : 2);
   const [hospitalLocation, setHospitalLocation] = useState(params.orgName || '');
   const [isEmergency, setIsEmergency] = useState(params.isEmergency === 'true' || false);
-  const [contactPerson, setContactPerson] = useState('');
-  const [contactNumber, setContactNumber] = useState('');
+  const [contactPerson, setContactPerson] = useState(profile?.name || user?.user_metadata?.full_name || '');
+  const [contactNumber, setContactNumber] = useState(profile?.phone || user?.user_metadata?.phone || '');
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
 

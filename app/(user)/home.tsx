@@ -6,7 +6,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import Colors from '@/constants/colors';
 import Badge from '@/components/ui/Badge';
-import BottomTabBar from '@/components/common/BottomTabBar';
 import { useAuth } from '@/lib/AuthContext';
 import { BloodService } from '@/services/api/bloodService';
 
@@ -53,7 +52,7 @@ export default function HomeScreen() {
               <View style={styles.miniLogo}>
                 <Ionicons name="water" size={20} color={Colors.primary.DEFAULT} />
               </View>
-              <Text style={styles.greetingTitle}>Hello, <Text style={styles.userName}>{profile?.name?.split(' ')[0] || 'there'} 👋</Text></Text>
+              <Text style={styles.greetingTitle}>Hello, <Text style={styles.userName}>{profile?.name?.split(' ')[0] || user?.user_metadata?.full_name?.split(' ')[0] || user?.user_metadata?.name?.split(' ')[0] || (user?.email ? user.email.split('@')[0] : 'there')} 👋</Text></Text>
             </View>
             <Text style={styles.taglineSmall}>Every Drop Saves Lives ❤️</Text>
             <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/(user)/search')} style={styles.locationPill}>
@@ -156,7 +155,6 @@ export default function HomeScreen() {
           </View>
         )}
       </ScrollView>
-      <BottomTabBar activeTab="home" />
     </SafeAreaView>
   );
 }

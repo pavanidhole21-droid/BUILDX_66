@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -6,7 +6,10 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
-  ActivityIndicator
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -14,12 +17,63 @@ import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import Colors from "@/constants/colors";
 import Header from "@/components/common/Header";
-import BottomTabBar from "@/components/common/BottomTabBar";
+import Button from "@/components/ui/Button";
 import { useAuth } from "@/lib/AuthContext";
+import { ALL_BLOOD_GROUPS, BloodGroup } from "@/types/blood";
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { profile, signOut: authSignOut } = useAuth();
+  const { user, profile, updateProfile, signOut: authSignOut } = useAuth();
+
+  // Edit Profile modal state
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editBloodGroup, setEditBloodGroup] = useState<BloodGroup | undefined>(undefined);
+  const [editCity, setEditCity] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  // Dynamic user details with robust fallbacks
+  const displayName =
+    profile?.name ||
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    (user?.email ? user.email.split("@")[0] : "BloodHelp User");
+
+  const displayEmail = profile?.email || user?.email || "No email";
+  const displayPhone = profile?.phone || user?.user_metadata?.phone || "No phone added";
+  const displayBloodGroup = profile?.bloodGroup || (user?.user_metadata?.blood_group as BloodGroup) || null;
+  const displayCity = profile?.city || user?.user_metadata?.city || "Nagpur";
+  const displayState = profile?.state || user?.user_metadata?.state || "Maharashtra";
+
+  const openEditModal = () => {
+    setEditName(displayName);
+    setEditPhone(displayPhone === "No phone added" ? "" : displayPhone);
+    setEditBloodGroup(displayBloodGroup || undefined);
+    setEditCity(displayCity);
+    setEditModalVisible(true);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!editName.trim()) {
+      Alert.alert("Name Required", "Please enter your name.");
+      return;
+    }
+    setSaving(true);
+    const { error } = await updateProfile({
+      name: editName.trim(),
+      phone: editPhone.trim(),
+      bloodGroup: editBloodGroup,
+      city: editCity.trim() || "Nagpur",
+    });
+    setSaving(false);
+    if (error) {
+      Alert.alert("Error", error);
+    } else {
+      setEditModalVisible(false);
+      Alert.alert("Success", "Profile updated successfully!");
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert("Logout", "Are you sure you want to sign out?", [
@@ -44,7 +98,7 @@ export default function ProfileScreen() {
     {
       icon: "person-outline",
       label: "Edit Profile",
-      onPress: () => alert(`Edit Profile: ${profile?.name} (${profile?.bloodGroup})`),
+      onPress: openEditModal,
     },
     {
       icon: "document-text-outline",
@@ -54,12 +108,12 @@ export default function ProfileScreen() {
     {
       icon: "bookmark-outline",
       label: "Saved Organizations",
-      onPress: () => alert("Saved: Government Medical College & Hospital"),
+      onPress: () => router.push("/(user)/saved"),
     },
     {
       icon: "settings-outline",
       label: "Settings",
-      onPress: () => alert("Notification & privacy settings"),
+      onPress: () => alert("Notification & privacy settings are configured."),
     },
     {
       icon: "globe-outline",
@@ -70,7 +124,7 @@ export default function ProfileScreen() {
     {
       icon: "help-circle-outline",
       label: "Help & Support",
-      onPress: () => alert("Support helpline: 1800-BLOOD-HELP"),
+      onPress: () => alert("Emergency Helpline: 9371742672"),
     },
   ];
 
@@ -88,26 +142,32 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.scrollContent}
       >
         {/* Profile Card Header */}
-        {!profile ? (
-          <View style={[styles.profileCard, { justifyContent: 'center', paddingVertical: 40 }]}>
-            <ActivityIndicator size="large" color={Colors.primary.DEFAULT} />
+        <View style={styles.profileCard}>
+          <View style={styles.avatar}>
+            <Ionicons name="person" size={36} color={Colors.primary.DEFAULT} />
           </View>
-        ) : (
-          <View style={styles.profileCard}>
-            <View style={styles.avatar}>
-              <Ionicons name="person" size={36} color={Colors.primary.DEFAULT} />
+          <View style={styles.profileDetails}>
+            <Text style={styles.userName}>{displayName}</Text>
+            <Text style={styles.userEmail}>{displayEmail}</Text>
+            <Text style={styles.userPhone}>{displayPhone}</Text>
+            <View style={styles.bloodBadge}>
+              <Ionicons name="water" size={12} color={Colors.primary.DEFAULT} />
+              <Text style={styles.bloodBadgeText}>
+                {displayBloodGroup ? `Donor Group: ${displayBloodGroup}` : "Group: Not set"}
+              </Text>
             </View>
-            <View style={styles.profileDetails}>
-              <Text style={styles.userName}>{profile?.name}</Text>
-              <Text style={styles.userEmail}>{profile?.email}</Text>
-              <Text style={styles.userPhone}>{profile?.phone}</Text>
-              <View style={styles.bloodBadge}>
-                <Ionicons name="water" size={12} color={Colors.primary.DEFAULT} />
-                <Text style={styles.bloodBadgeText}>Donor Group: {profile?.bloodGroup}</Text>
-              </View>
-            </View>
+            <Text style={styles.locationSmall}>
+              📍 {displayCity}, {displayState}
+            </Text>
           </View>
-        )}
+          <TouchableOpacity
+            onPress={openEditModal}
+            style={styles.editIconBtn}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="pencil" size={16} color={Colors.primary.DEFAULT} />
+          </TouchableOpacity>
+        </View>
 
         {/* Menu Items List */}
         <View style={styles.menuContainer}>
@@ -157,7 +217,90 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </ScrollView>
 
-      <BottomTabBar activeTab="profile" />
+      {/* Edit Profile Modal */}
+      <Modal
+        visible={editModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit Profile</Text>
+              <TouchableOpacity onPress={() => setEditModalVisible(false)}>
+                <Ionicons name="close-circle" size={26} color={Colors.text.muted} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.inputLabel}>Full Name</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={editName}
+                onChangeText={setEditName}
+                placeholder="Enter your full name"
+                placeholderTextColor={Colors.text.muted}
+              />
+
+              <Text style={styles.inputLabel}>Phone Number</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={editPhone}
+                onChangeText={setEditPhone}
+                placeholder="+91 9876543210"
+                placeholderTextColor={Colors.text.muted}
+                keyboardType="phone-pad"
+              />
+
+              <Text style={styles.inputLabel}>City</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={editCity}
+                onChangeText={setEditCity}
+                placeholder="City"
+                placeholderTextColor={Colors.text.muted}
+              />
+
+              <Text style={styles.inputLabel}>Blood Group</Text>
+              <View style={styles.bgSelectorRow}>
+                {ALL_BLOOD_GROUPS.map((bg) => (
+                  <TouchableOpacity
+                    key={bg}
+                    onPress={() => setEditBloodGroup(bg === editBloodGroup ? undefined : bg)}
+                    style={[
+                      styles.bgChip,
+                      editBloodGroup === bg && styles.bgChipActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.bgChipText,
+                        editBloodGroup === bg && styles.bgChipTextActive,
+                      ]}
+                    >
+                      {bg}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <View style={{ marginTop: 20 }}>
+                <Button
+                  title="Save Changes"
+                  onPress={handleSaveProfile}
+                  loading={saving}
+                  fullWidth
+                  size="lg"
+                />
+              </View>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -180,7 +323,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.surface.border,
     marginBottom: 20,
-    gap: 16,
+    gap: 14,
+    position: "relative",
   },
   avatar: {
     width: 64,
@@ -225,6 +369,19 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
     color: Colors.primary.DEFAULT,
+  },
+  locationSmall: {
+    fontSize: 11,
+    color: Colors.text.muted,
+    marginTop: 4,
+  },
+  editIconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: Colors.primary.lighter,
+    alignItems: "center",
+    justifyContent: "center",
   },
   menuContainer: {
     backgroundColor: "#FFFFFF",
@@ -284,4 +441,71 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "800",
   },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    maxHeight: "85%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: Colors.text.primary,
+  },
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: Colors.text.primary,
+    marginBottom: 6,
+    marginTop: 12,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: Colors.surface.border,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: Colors.text.primary,
+    backgroundColor: Colors.surface.white,
+  },
+  bgSelectorRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 6,
+  },
+  bgChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.surface.border,
+    backgroundColor: "#FFFFFF",
+  },
+  bgChipActive: {
+    backgroundColor: Colors.primary.DEFAULT,
+    borderColor: Colors.primary.DEFAULT,
+  },
+  bgChipText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: Colors.text.primary,
+  },
+  bgChipTextActive: {
+    color: "#FFFFFF",
+  },
 });
+

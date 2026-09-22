@@ -14,7 +14,7 @@ import { useAuth } from '@/lib/AuthContext';
 
 export default function EmergencyScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [bloodGroup, setBloodGroup] = useState<BloodGroup>('O+');
   const [units, setUnits] = useState(2);
   const [loading, setLoading] = useState(false);
@@ -35,12 +35,12 @@ export default function EmergencyScreen() {
         patientName: 'Emergency Patient',
         bloodGroup, units,
         hospitalName: 'Nearest Verified Hospital (GPS Broadcast)',
-        hospitalAddress: 'Nagpur, Maharashtra',
+        hospitalAddress: `${profile?.city || 'Nagpur'}, ${profile?.state || 'Maharashtra'}`,
         isEmergency: true,
-        contactPerson: 'Emergency Contact',
-        contactPhone: Config.emergencyHelplineFormatted,
+        contactPerson: profile?.name || user?.user_metadata?.full_name || 'Emergency Contact',
+        contactPhone: profile?.phone || Config.emergencyHelplineFormatted,
         additionalNote: 'EMERGENCY SOS: Critical blood requirement broadcast',
-      }, user!.id);
+      }, user.id);
       router.replace({ pathname: '/(user)/confirmation', params: { requestId: created.id, bloodGroup: created.bloodGroup, units: created.units.toString(), hospital: 'Nearest Verified Hospital (Broadcast)', status: 'Searching' } });
     } catch (e) {
       console.error(e);
