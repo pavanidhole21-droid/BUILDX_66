@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -14,63 +15,63 @@ import { StatusBar } from "expo-status-bar";
 import Colors from "@/constants/colors";
 import Header from "@/components/common/Header";
 import Badge from "@/components/ui/Badge";
+import { OrganizationService } from "@/services/api/organizationService";
+import { Organization } from "@/types/organization";
 
 export default function AdminDashboard() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"analytics" | "organizations">("analytics");
 
-  const [orgs, setOrgs] = useState([
-    {
-      id: "org_1",
-      name: "Government Medical College",
-      type: "Hospital",
-      location: "Nagpur",
-      status: "Verified",
-    },
-    {
-      id: "org_2",
-      name: "Red Cross Blood Bank",
-      type: "Blood Bank",
-      location: "Nagpur",
-      status: "Verified",
-    },
-    {
-      id: "org_3",
-      name: "LifeCare Hospital",
-      type: "Hospital",
-      location: "Nagpur",
-      status: "Pending",
-    },
-    {
-      id: "org_4",
-      name: "City Blood Bank",
-      type: "Blood Bank",
-      location: "Nagpur",
-      status: "Verified",
-    },
-  ]);
+  const [stats, setStats] = useState({
+    totalOrgs: 0,
+    verifiedOrgs: 0,
+    pendingOrgs: 0,
+    totalRequests: 0,
+  });
+  const [orgs, setOrgs] = useState<Organization[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleToggleVerify = (id: string) => {
-    setOrgs((prev) =>
-      prev.map((o) =>
-        o.id === id
-          ? { ...o, status: o.status === "Verified" ? "Pending" : "Verified" }
-          : o
-      )
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    const [fetchedStats, fetchedOrgs] = await Promise.all([
+      OrganizationService.getAdminStats(),
+      OrganizationService.getAll(),
+    ]);
+    setStats(fetchedStats);
+    setOrgs(fetchedOrgs);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const handleToggleVerify = async (org: Organization) => {
+    const newStatus = !org.isVerified;
+    Alert.alert(
+      newStatus ? "Verify Organization" : "Unverify Organization",
+      `${newStatus ? "Verify" : "Unverify"} ${org.name}?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Confirm",
+          onPress: async () => {
+            const { error } = await OrganizationService.toggleVerification(org.id, newStatus);
+            if (error) {
+              Alert.alert("Error", error);
+            } else {
+              setOrgs((prev) =>
+                prev.map((o) => o.id === org.id ? { ...o, isVerified: newStatus } : o)
+              );
+              setStats((prev) => ({
+                ...prev,
+                verifiedOrgs: prev.verifiedOrgs + (newStatus ? 1 : -1),
+                pendingOrgs: prev.pendingOrgs + (newStatus ? -1 : 1),
+              }));
+            }
+          },
+        },
+      ]
     );
-    Alert.alert("Status Updated", "Organization verification status toggled.");
   };
-
-  const bloodGroupStats = [
-    { group: "O+", count: 42 },
-    { group: "A+", count: 28 },
-    { group: "B+", count: 32 },
-    { group: "AB+", count: 12 },
-    { group: "O-", count: 8 },
-    { group: "A-", count: 6 },
-    { group: "B-", count: 5 },
-    { group: "AB-", count: 3 },
-  ];
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
@@ -81,388 +82,199 @@ export default function AdminDashboard() {
         onBackPress={() => router.replace("/(user)/home")}
       />
 
-      {/* Admin Title Bar */}
+      {/* Admin identity bar */}
       <View style={styles.adminBar}>
-        <View style={styles.adminBarLeft}>
-          <Ionicons name="shield-checkmark" size={22} color={Colors.primary.DEFAULT} />
-          <Text style={styles.adminTitle}>BloodHelp Admin</Text>
+        <Ionicons name="shield-checkmark" size={18} color={Colors.status.info} />
+        <Text style={styles.adminBarText}>BloodHelp Admin</Text>
+        <View style={styles.adminBadge}>
+          <Text style={styles.adminBadgeText}>Super Admin</Text>
         </View>
-        <Text style={styles.adminBadge}>Super Admin</Text>
       </View>
 
       {/* Tabs */}
-      <View style={styles.tabsRow}>
+      <View style={styles.tabBar}>
         <TouchableOpacity
           onPress={() => setActiveTab("analytics")}
-          style={[styles.tabBtn, activeTab === "analytics" && styles.tabBtnActive]}
+          style={[styles.tab, activeTab === "analytics" && styles.tabActive]}
         >
           <Text style={[styles.tabText, activeTab === "analytics" && styles.tabTextActive]}>
             Analytics & Monitoring
           </Text>
         </TouchableOpacity>
-
         <TouchableOpacity
           onPress={() => setActiveTab("organizations")}
-          style={[styles.tabBtn, activeTab === "organizations" && styles.tabBtnActive]}
+          style={[styles.tab, activeTab === "organizations" && styles.tabActive]}
         >
           <Text style={[styles.tabText, activeTab === "organizations" && styles.tabTextActive]}>
-            Organizations ({orgs.length})
+            Organizations ({stats.totalOrgs})
           </Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {activeTab === "analytics" ? (
-          <View>
-            {/* KPI Stat Cards Grid */}
-            <View style={styles.statsGrid}>
-              <View style={styles.statCard}>
-                <Text style={styles.statValue}>48</Text>
-                <Text style={styles.statLabel}>Total Organizations</Text>
+      {loading ? (
+        <ActivityIndicator size="large" color={Colors.primary.DEFAULT} style={{ flex: 1 }} />
+      ) : (
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+          {/* ── ANALYTICS TAB ── */}
+          {activeTab === "analytics" && (
+            <View>
+              {/* KPI Cards */}
+              <View style={styles.kpiGrid}>
+                <View style={styles.kpiCard}>
+                  <Text style={styles.kpiValue}>{stats.totalOrgs}</Text>
+                  <Text style={styles.kpiLabel}>Total Orgs</Text>
+                </View>
+                <View style={[styles.kpiCard, { borderColor: "#BBF7D0" }]}>
+                  <Text style={[styles.kpiValue, { color: "#16A34A" }]}>{stats.verifiedOrgs}</Text>
+                  <Text style={styles.kpiLabel}>Verified</Text>
+                </View>
+                <View style={[styles.kpiCard, { borderColor: "#FED7AA" }]}>
+                  <Text style={[styles.kpiValue, { color: "#D97706" }]}>{stats.pendingOrgs}</Text>
+                  <Text style={styles.kpiLabel}>Pending</Text>
+                </View>
+                <View style={[styles.kpiCard, { borderColor: "#BFDBFE" }]}>
+                  <Text style={[styles.kpiValue, { color: Colors.status.info }]}>{stats.totalRequests}</Text>
+                  <Text style={styles.kpiLabel}>Requests</Text>
+                </View>
               </View>
 
-              <View style={styles.statCard}>
-                <Text style={[styles.statValue, { color: "#16A34A" }]}>36</Text>
-                <Text style={styles.statLabel}>Verified Centers</Text>
-              </View>
-
-              <View style={styles.statCard}>
-                <Text style={[styles.statValue, { color: "#D97706" }]}>12</Text>
-                <Text style={styles.statLabel}>Pending Review</Text>
-              </View>
-
-              <View style={styles.statCard}>
-                <Text style={[styles.statValue, { color: Colors.primary.DEFAULT }]}>
-                  124
-                </Text>
-                <Text style={styles.statLabel}>Total Requests</Text>
-              </View>
-            </View>
-
-            {/* Requests by Blood Group Bar Representation */}
-            <View style={styles.chartCard}>
-              <View style={styles.chartHeader}>
-                <Text style={styles.chartTitle}>Requests by Blood Group</Text>
-                <Text style={styles.chartPeriod}>Last 30 days</Text>
-              </View>
-
-              <View style={styles.barsContainer}>
-                {bloodGroupStats.map((item) => {
-                  const heightPercent = (item.count / 42) * 100;
-                  return (
-                    <View key={item.group} style={styles.barCol}>
-                      <Text style={styles.barCount}>{item.count}</Text>
-                      <View style={styles.barTrack}>
-                        <View
-                          style={[
-                            styles.barFill,
-                            { height: `${heightPercent}%` },
-                          ]}
-                        />
-                      </View>
-                      <Text style={styles.barGroupLabel}>{item.group}</Text>
-                    </View>
-                  );
-                })}
-              </View>
-            </View>
-
-            {/* Stale Inventory Monitoring Alert */}
-            <View style={styles.staleNotice}>
-              <Ionicons name="alert-circle" size={20} color="#D97706" />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.staleTitle}>Stale Inventory Detection</Text>
-                <Text style={styles.staleSub}>
-                  2 organizations haven't updated availability in &gt; 2 hours. Automated reminder dispatched.
-                </Text>
-              </View>
-            </View>
-          </View>
-        ) : (
-          /* Organization Management */
-          <View>
-            <View style={styles.orgHeaderRow}>
-              <Text style={styles.orgHeaderTitle}>Verified Center Directory</Text>
-              <TouchableOpacity
-                onPress={() => alert("Add Organization modal")}
-                style={styles.addOrgBtn}
-              >
-                <Ionicons name="add" size={16} color="#FFFFFF" />
-                <Text style={styles.addOrgText}>Add Org</Text>
-              </TouchableOpacity>
-            </View>
-
-            {orgs.map((o) => (
-              <View key={o.id} style={styles.orgRowCard}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.orgRowName}>{o.name}</Text>
-                  <Text style={styles.orgRowMeta}>
-                    {o.type} • {o.location}
+              {/* Summary */}
+              <View style={styles.summaryCard}>
+                <Text style={styles.summaryTitle}>System Overview</Text>
+                <View style={styles.summaryRow}>
+                  <Ionicons name="checkmark-circle" size={16} color="#16A34A" />
+                  <Text style={styles.summaryText}>
+                    {stats.verifiedOrgs} verified organizations active
                   </Text>
                 </View>
-
-                <TouchableOpacity
-                  onPress={() => handleToggleVerify(o.id)}
-                  style={[
-                    styles.verifyToggleBadge,
-                    o.status === "Verified"
-                      ? styles.badgeVerified
-                      : styles.badgePending,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.verifyToggleText,
-                      o.status === "Verified"
-                        ? { color: "#16A34A" }
-                        : { color: "#D97706" },
-                    ]}
-                  >
-                    {o.status}
+                <View style={styles.summaryRow}>
+                  <Ionicons name="time-outline" size={16} color="#D97706" />
+                  <Text style={styles.summaryText}>
+                    {stats.pendingOrgs} organizations pending verification
                   </Text>
-                </TouchableOpacity>
+                </View>
+                <View style={styles.summaryRow}>
+                  <Ionicons name="document-text-outline" size={16} color={Colors.primary.DEFAULT} />
+                  <Text style={styles.summaryText}>
+                    {stats.totalRequests} total blood requests submitted
+                  </Text>
+                </View>
               </View>
-            ))}
-          </View>
-        )}
-      </ScrollView>
+
+              {/* Stale inventory warning */}
+              {orgs.some((o) => o.lastUpdatedMinutesAgo > 60) && (
+                <View style={styles.warningCard}>
+                  <Ionicons name="warning-outline" size={18} color="#D97706" />
+                  <Text style={styles.warningText}>
+                    {orgs.filter((o) => o.lastUpdatedMinutesAgo > 60).length} organization(s) have stale inventory (last updated &gt;60 min ago)
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* ── ORGANIZATIONS TAB ── */}
+          {activeTab === "organizations" && (
+            <View>
+              {orgs.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Ionicons name="business-outline" size={48} color={Colors.text.muted} />
+                  <Text style={styles.emptyText}>No organizations found</Text>
+                </View>
+              ) : (
+                orgs.map((org) => (
+                  <View key={org.id} style={styles.orgCard}>
+                    <View style={styles.orgCardTop}>
+                      <View style={styles.orgInfo}>
+                        <Text style={styles.orgName}>{org.name}</Text>
+                        <Text style={styles.orgMeta}>{org.type} • {org.city}</Text>
+                      </View>
+                      <Badge
+                        label={org.isVerified ? "Verified" : "Pending"}
+                        variant="status"
+                        status={org.isVerified ? "Accepted" : "Searching"}
+                      />
+                    </View>
+                    <View style={styles.orgCardFooter}>
+                      <Text style={styles.orgUpdated}>
+                        Updated {org.lastUpdatedMinutesAgo} min ago
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => handleToggleVerify(org)}
+                        style={[
+                          styles.verifyBtn,
+                          org.isVerified ? styles.verifyBtnActive : styles.verifyBtnInactive,
+                        ]}
+                      >
+                        <Ionicons
+                          name={org.isVerified ? "close-circle-outline" : "checkmark-circle-outline"}
+                          size={14}
+                          color={org.isVerified ? "#DC2626" : "#16A34A"}
+                        />
+                        <Text
+                          style={[
+                            styles.verifyBtnText,
+                            { color: org.isVerified ? "#DC2626" : "#16A34A" },
+                          ]}
+                        >
+                          {org.isVerified ? "Unverify" : "Verify"}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))
+              )}
+
+              <TouchableOpacity
+                style={styles.addOrgBtn}
+                onPress={() => Alert.alert("Add Organization", "Use Supabase dashboard to add new organizations and assign provider_user_id.")}
+              >
+                <Ionicons name="add-circle-outline" size={20} color={Colors.primary.DEFAULT} />
+                <Text style={styles.addOrgBtnText}>Add Organization</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F8FAFC",
-  },
-  adminBar: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.surface.border,
-  },
-  adminBarLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  adminTitle: {
-    fontSize: 16,
-    fontWeight: "900",
-    color: Colors.text.primary,
-  },
-  adminBadge: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: Colors.primary.DEFAULT,
-    backgroundColor: Colors.primary.light,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  tabsRow: {
-    flexDirection: "row",
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.surface.border,
-  },
-  tabBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: "center",
-    borderBottomWidth: 2,
-    borderBottomColor: "transparent",
-  },
-  tabBtnActive: {
-    borderBottomColor: Colors.primary.DEFAULT,
-  },
-  tabText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: Colors.text.muted,
-  },
-  tabTextActive: {
-    color: Colors.primary.DEFAULT,
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 24,
-  },
-  statsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-    marginBottom: 16,
-  },
-  statCard: {
-    width: "48%",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.surface.border,
-    alignItems: "center",
-  },
-  statValue: {
-    fontSize: 28,
-    fontWeight: "900",
-    color: Colors.text.primary,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: Colors.text.secondary,
-    marginTop: 4,
-    textAlign: "center",
-  },
-  chartCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.surface.border,
-    marginBottom: 16,
-  },
-  chartHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  chartTitle: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: Colors.text.primary,
-  },
-  chartPeriod: {
-    fontSize: 12,
-    color: Colors.text.muted,
-  },
-  barsContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    height: 140,
-    paddingTop: 20,
-  },
-  barCol: {
-    alignItems: "center",
-    flex: 1,
-  },
-  barCount: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: Colors.text.muted,
-    marginBottom: 4,
-  },
-  barTrack: {
-    width: 14,
-    height: 90,
-    backgroundColor: Colors.surface.muted,
-    borderRadius: 7,
-    justifyContent: "flex-end",
-    overflow: "hidden",
-  },
-  barFill: {
-    width: "100%",
-    backgroundColor: Colors.primary.DEFAULT,
-    borderRadius: 7,
-  },
-  barGroupLabel: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: Colors.text.primary,
-    marginTop: 6,
-  },
-  staleNotice: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    backgroundColor: "#FEF3C7",
-    padding: 14,
-    borderRadius: 12,
-    gap: 10,
-    borderWidth: 1,
-    borderColor: "#FDE68A",
-  },
-  staleTitle: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: "#92400E",
-  },
-  staleSub: {
-    fontSize: 12,
-    color: "#B45309",
-    marginTop: 2,
-    lineHeight: 16,
-  },
-  orgHeaderRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  orgHeaderTitle: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: Colors.text.primary,
-  },
-  addOrgBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.primary.DEFAULT,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    gap: 4,
-  },
-  addOrgText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  orgRowCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: Colors.surface.border,
-    marginBottom: 10,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  orgRowName: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: Colors.text.primary,
-  },
-  orgRowMeta: {
-    fontSize: 12,
-    color: Colors.text.secondary,
-    marginTop: 2,
-  },
-  verifyToggleBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  badgeVerified: {
-    backgroundColor: "#DCFCE7",
-    borderColor: "#86EFAC",
-  },
-  badgePending: {
-    backgroundColor: "#FEF3C7",
-    borderColor: "#FDE68A",
-  },
-  verifyToggleText: {
-    fontSize: 12,
-    fontWeight: "800",
-  },
+  container: { flex: 1, backgroundColor: "#F8FAFC" },
+  adminBar: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 10, backgroundColor: "#EFF6FF", borderBottomWidth: 1, borderBottomColor: "#BFDBFE", gap: 8 },
+  adminBarText: { fontSize: 14, fontWeight: "700", color: Colors.text.primary, flex: 1 },
+  adminBadge: { backgroundColor: Colors.status.info, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
+  adminBadgeText: { fontSize: 10, fontWeight: "800", color: "#FFFFFF" },
+  tabBar: { flexDirection: "row", backgroundColor: "#FFFFFF", borderBottomWidth: 1, borderBottomColor: "#E2E8F0" },
+  tab: { flex: 1, paddingVertical: 12, alignItems: "center", paddingHorizontal: 8 },
+  tabActive: { borderBottomWidth: 2, borderBottomColor: Colors.primary.DEFAULT },
+  tabText: { fontSize: 11, fontWeight: "700", color: Colors.text.muted, textAlign: "center" },
+  tabTextActive: { color: Colors.primary.DEFAULT },
+  scrollContent: { padding: 16, paddingBottom: 40 },
+  kpiGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 20 },
+  kpiCard: { flex: 1, minWidth: "45%", backgroundColor: "#FFFFFF", borderRadius: 14, padding: 16, alignItems: "center", borderWidth: 1.5, borderColor: Colors.surface.border },
+  kpiValue: { fontSize: 32, fontWeight: "900", color: Colors.primary.DEFAULT },
+  kpiLabel: { fontSize: 11, color: Colors.text.muted, fontWeight: "600", marginTop: 4, textTransform: "uppercase", letterSpacing: 0.5 },
+  summaryCard: { backgroundColor: "#FFFFFF", borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: "#E2E8F0", gap: 10 },
+  summaryTitle: { fontSize: 14, fontWeight: "800", color: Colors.text.primary, marginBottom: 4 },
+  summaryRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  summaryText: { fontSize: 13, color: Colors.text.secondary, flex: 1 },
+  warningCard: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#FFFBEB", borderRadius: 12, padding: 12, borderWidth: 1, borderColor: "#FDE68A" },
+  warningText: { fontSize: 12, color: "#92400E", flex: 1, fontWeight: "500" },
+  emptyState: { alignItems: "center", paddingTop: 60, gap: 12 },
+  emptyText: { fontSize: 15, color: Colors.text.muted, fontWeight: "600" },
+  orgCard: { backgroundColor: "#FFFFFF", borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: "#E2E8F0" },
+  orgCardTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 },
+  orgInfo: { flex: 1, marginRight: 8 },
+  orgName: { fontSize: 14, fontWeight: "800", color: Colors.text.primary },
+  orgMeta: { fontSize: 12, color: Colors.text.muted, marginTop: 2 },
+  orgCardFooter: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderTopWidth: 1, borderTopColor: "#F1F5F9", paddingTop: 10 },
+  orgUpdated: { fontSize: 11, color: Colors.text.muted },
+  verifyBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1 },
+  verifyBtnActive: { borderColor: "#FECACA", backgroundColor: "#FEF2F2" },
+  verifyBtnInactive: { borderColor: "#BBF7D0", backgroundColor: "#F0FDF4" },
+  verifyBtnText: { fontSize: 12, fontWeight: "700" },
+  addOrgBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, marginTop: 8, borderRadius: 12, borderWidth: 1.5, borderStyle: "dashed", borderColor: Colors.primary.DEFAULT, backgroundColor: Colors.primary.lighter },
+  addOrgBtnText: { fontSize: 14, fontWeight: "700", color: Colors.primary.DEFAULT },
 });

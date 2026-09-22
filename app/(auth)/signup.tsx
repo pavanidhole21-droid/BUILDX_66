@@ -20,15 +20,21 @@ import Colors from "@/constants/colors";
 import Logo from "@/components/ui/Logo";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
+import { useAuth } from "@/lib/AuthContext";
+import { BloodGroup, ALL_BLOOD_GROUPS } from "@/types/blood";
 
 export default function SignupScreen() {
   const router = useRouter();
-  const [fullName, setFullName] = useState("Rohit Bramhe");
-  const [email, setEmail] = useState("rohit@example.com");
-  const [phone, setPhone] = useState("+91 9876543210");
-  const [password, setPassword] = useState("••••••••");
-  const [agreeTerms, setAgreeTerms] = useState(true);
-  const [loading, setLoading] = useState(false);
+  const { signUp, loading } = useAuth();
+
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [selectedBloodGroup, setSelectedBloodGroup] = useState<BloodGroup | null>(null);
+  const [agreeTerms, setAgreeTerms] = useState(false);
+  const [signingUp, setSigningUp] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Location Permission State
   const [locationGranted, setLocationGranted] = useState(false);
@@ -75,7 +81,33 @@ export default function SignupScreen() {
     }
   };
 
+  const submitRegistration = async () => {
+    setSigningUp(true);
+    const city = locationName?.split(",")[0]?.trim() || "Nagpur";
+    const state = locationName?.split(",")[1]?.trim() || "Maharashtra";
+
+    const { error } = await signUp(email.trim(), password, {
+      name: fullName.trim(),
+      phone: phone.trim(),
+      bloodGroup: selectedBloodGroup || undefined,
+      city,
+      state,
+      role: "recipient",
+      language: "en",
+    });
+    setSigningUp(false);
+
+    if (error) {
+      Alert.alert("Sign Up Failed", error);
+    }
+    // On success, AuthGuard in _layout.tsx redirects to home automatically
+  };
+
   const handleSignup = () => {
+    if (!fullName.trim()) { Alert.alert("Error", "Please enter your full name."); return; }
+    if (!email.trim()) { Alert.alert("Error", "Please enter your email."); return; }
+    if (!phone.trim()) { Alert.alert("Error", "Please enter your phone number."); return; }
+    if (password.length < 6) { Alert.alert("Error", "Password must be at least 6 characters."); return; }
     if (!agreeTerms) {
       Alert.alert("Terms Required", "Please agree to the Terms & Privacy Policy to continue.");
       return;
@@ -105,17 +137,7 @@ export default function SignupScreen() {
     }
   };
 
-  const submitRegistration = () => {
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      router.replace("/(user)/home");
-    }, 600);
-  };
-
-  const handleGoLogin = () => {
-    router.back();
-  };
+  const handleGoLogin = () => { router.back(); };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -127,6 +149,7 @@ export default function SignupScreen() {
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           {/* Logo */}
           <View style={styles.logoContainer}>
@@ -146,15 +169,8 @@ export default function SignupScreen() {
               value={fullName}
               onChangeText={setFullName}
               placeholder="e.g. Rohit Bramhe"
-              leftIcon={
-                <Ionicons
-                  name="person-outline"
-                  size={20}
-                  color={Colors.text.muted}
-                />
-              }
+              leftIcon={<Ionicons name="person-outline" size={20} color={Colors.text.muted} />}
             />
-
             <Input
               label="Email"
               value={email}
@@ -162,44 +178,53 @@ export default function SignupScreen() {
               placeholder="e.g. rohit@example.com"
               keyboardType="email-address"
               autoCapitalize="none"
-              leftIcon={
-                <Ionicons
-                  name="mail-outline"
-                  size={20}
-                  color={Colors.text.muted}
-                />
-              }
+              leftIcon={<Ionicons name="mail-outline" size={20} color={Colors.text.muted} />}
             />
-
             <Input
               label="Phone Number"
               value={phone}
               onChangeText={setPhone}
               placeholder="e.g. +91 9876543210"
               keyboardType="phone-pad"
-              leftIcon={
-                <Ionicons
-                  name="call-outline"
-                  size={20}
-                  color={Colors.text.muted}
-                />
-              }
+              leftIcon={<Ionicons name="call-outline" size={20} color={Colors.text.muted} />}
             />
-
             <Input
               label="Password"
               value={password}
               onChangeText={setPassword}
-              placeholder="Create a strong password"
-              secureTextEntry
-              leftIcon={
-                <Ionicons
-                  name="lock-closed-outline"
-                  size={20}
-                  color={Colors.text.muted}
-                />
+              placeholder="Min. 6 characters"
+              secureTextEntry={!showPassword}
+              leftIcon={<Ionicons name="lock-closed-outline" size={20} color={Colors.text.muted} />}
+              rightIcon={
+                <TouchableOpacity onPress={() => setShowPassword((p) => !p)}>
+                  <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color={Colors.text.muted} />
+                </TouchableOpacity>
               }
             />
+
+            {/* Blood Group Picker */}
+            <Text style={styles.fieldLabel}>Blood Group (optional)</Text>
+            <View style={styles.bloodGroupGrid}>
+              {ALL_BLOOD_GROUPS.map((bg) => (
+                <TouchableOpacity
+                  key={bg}
+                  onPress={() => setSelectedBloodGroup(bg === selectedBloodGroup ? null : bg)}
+                  style={[
+                    styles.bloodGroupChip,
+                    selectedBloodGroup === bg && styles.bloodGroupChipActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.bloodGroupChipText,
+                      selectedBloodGroup === bg && styles.bloodGroupChipTextActive,
+                    ]}
+                  >
+                    {bg}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
             {/* Location Permission Section */}
             <View
@@ -277,15 +302,8 @@ export default function SignupScreen() {
               onPress={() => setAgreeTerms((prev) => !prev)}
               style={styles.termsRow}
             >
-              <View
-                style={[
-                  styles.checkbox,
-                  agreeTerms && styles.checkboxActive,
-                ]}
-              >
-                {agreeTerms && (
-                  <Ionicons name="checkmark" size={14} color="#FFFFFF" />
-                )}
+              <View style={[styles.checkbox, agreeTerms && styles.checkboxActive]}>
+                {agreeTerms && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
               </View>
               <Text style={styles.termsText}>
                 I agree to the{" "}
@@ -296,7 +314,7 @@ export default function SignupScreen() {
             <Button
               title="Sign Up"
               onPress={handleSignup}
-              loading={loading}
+              loading={signingUp || loading}
               size="lg"
               fullWidth
             />
@@ -349,6 +367,39 @@ const styles = StyleSheet.create({
   },
   form: {
     width: "100%",
+  },
+  fieldLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: Colors.text.primary,
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  bloodGroupGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 20,
+  },
+  bloodGroupChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: Colors.surface.border,
+    backgroundColor: "#FFFFFF",
+  },
+  bloodGroupChipActive: {
+    backgroundColor: Colors.primary.DEFAULT,
+    borderColor: Colors.primary.DEFAULT,
+  },
+  bloodGroupChipText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: Colors.text.primary,
+  },
+  bloodGroupChipTextActive: {
+    color: "#FFFFFF",
   },
   locationCard: {
     backgroundColor: Colors.surface.muted,

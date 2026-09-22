@@ -1,19 +1,15 @@
-import { getEnv } from "./env";
+import { createClient } from "@supabase/supabase-js";
+import Config from "@/constants/config";
 
-/**
- * Supabase client placeholder.
- * Ready for @supabase/supabase-js when backend is connected.
- * Keeps keys isolated to environment variables.
- */
-const env = getEnv();
+const supabaseUrl = Config.supabase.url;
+const supabaseAnonKey = Config.supabase.anonKey;
 
 export const isSupabaseConfigured = Boolean(
-  env.supabaseUrl && env.supabaseAnonKey && env.supabaseAnonKey !== "demo-anon-key"
+  supabaseUrl && supabaseAnonKey && supabaseAnonKey !== "demo-anon-key"
 );
 
-export const supabaseClient = {
-  isConfigured: isSupabaseConfigured,
-  url: env.supabaseUrl,
-};
+export const supabase = isSupabaseConfigured
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : null;
 
-export default supabaseClient;
+export default supabase;

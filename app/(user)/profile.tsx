@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   View,
   Text,
@@ -6,19 +6,20 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  ActivityIndicator
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import Colors from "@/constants/colors";
-import { MOCK_USER } from "@/services/api/mockData";
 import Header from "@/components/common/Header";
 import BottomTabBar from "@/components/common/BottomTabBar";
+import { useAuth } from "@/lib/AuthContext";
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const [user, setUser] = useState(MOCK_USER);
+  const { profile, signOut: authSignOut } = useAuth();
 
   const handleLogout = () => {
     Alert.alert("Logout", "Are you sure you want to sign out?", [
@@ -26,7 +27,10 @@ export default function ProfileScreen() {
       {
         text: "Logout",
         style: "destructive",
-        onPress: () => router.replace("/(auth)/login"),
+        onPress: async () => {
+          await authSignOut();
+          router.replace("/(auth)/login");
+        },
       },
     ]);
   };
@@ -40,7 +44,7 @@ export default function ProfileScreen() {
     {
       icon: "person-outline",
       label: "Edit Profile",
-      onPress: () => alert("Edit Profile: Rohit Bramhe (O+)"),
+      onPress: () => alert(`Edit Profile: ${profile?.name} (${profile?.bloodGroup})`),
     },
     {
       icon: "document-text-outline",
@@ -84,20 +88,26 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.scrollContent}
       >
         {/* Profile Card Header */}
-        <View style={styles.profileCard}>
-          <View style={styles.avatar}>
-            <Ionicons name="person" size={36} color={Colors.primary.DEFAULT} />
+        {!profile ? (
+          <View style={[styles.profileCard, { justifyContent: 'center', paddingVertical: 40 }]}>
+            <ActivityIndicator size="large" color={Colors.primary.DEFAULT} />
           </View>
-          <View style={styles.profileDetails}>
-            <Text style={styles.userName}>{user.name}</Text>
-            <Text style={styles.userEmail}>{user.email}</Text>
-            <Text style={styles.userPhone}>{user.phone}</Text>
-            <View style={styles.bloodBadge}>
-              <Ionicons name="water" size={12} color={Colors.primary.DEFAULT} />
-              <Text style={styles.bloodBadgeText}>Donor Group: {user.bloodGroup}</Text>
+        ) : (
+          <View style={styles.profileCard}>
+            <View style={styles.avatar}>
+              <Ionicons name="person" size={36} color={Colors.primary.DEFAULT} />
+            </View>
+            <View style={styles.profileDetails}>
+              <Text style={styles.userName}>{profile?.name}</Text>
+              <Text style={styles.userEmail}>{profile?.email}</Text>
+              <Text style={styles.userPhone}>{profile?.phone}</Text>
+              <View style={styles.bloodBadge}>
+                <Ionicons name="water" size={12} color={Colors.primary.DEFAULT} />
+                <Text style={styles.bloodBadgeText}>Donor Group: {profile?.bloodGroup}</Text>
+              </View>
             </View>
           </View>
-        </View>
+        )}
 
         {/* Menu Items List */}
         <View style={styles.menuContainer}>
