@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import Colors from '@/constants/colors';
+import Config from '@/constants/config';
 import { ALL_BLOOD_GROUPS } from '@/types/blood';
 import { Organization } from '@/types/organization';
 import { OrganizationService } from '@/services/api/organizationService';
@@ -43,9 +44,10 @@ export default function OrganizationDetailsScreen() {
   }
 
   const handleCall = () => {
-    Alert.alert('Confirm Availability', `Call ${org.name} at ${org.phone}?`, [
+    const phoneToCall = org.phone || Config.emergencyHelpline;
+    Alert.alert('Confirm Availability', `Call ${org.name} at ${phoneToCall}?`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Call Now', onPress: () => Linking.openURL(`tel:${org.phone.replace(/\s+/g, '')}`) },
+      { text: 'Call Now', onPress: () => Linking.openURL(`tel:${phoneToCall.replace(/\s+/g, '')}`) },
     ]);
   };
   const handleNavigate = () => {

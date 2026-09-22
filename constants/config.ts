@@ -7,6 +7,8 @@ export const Config = {
   tagline: "Find the blood help you need, where it is available.",
   subTagline: "Every Drop Counts, Every Life Matters",
   version: "1.0.0",
+  emergencyHelpline: "9371742672",
+  emergencyHelplineFormatted: "+91 9371742672",
 
   api: {
     baseUrl: process.env.EXPO_PUBLIC_API_URL || "https://api.bloodhelp.org/v1",

@@ -16,6 +16,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import Colors from "@/constants/colors";
+import Config from "@/constants/config";
 import { BloodGroup, ALL_BLOOD_GROUPS } from "@/types/blood";
 import {
   BloodService,
@@ -38,10 +39,10 @@ export default function SearchScreen() {
   const [selectedOrgIndex, setSelectedOrgIndex] = useState(0);
 
   // Filters
-  const [showFilterModal, setShowFilterModal] = useState(false);
-  const [filterDistance, setFilterDistance] = useState(10);
+  const [filterDistance, setFilterDistance] = useState<number | null>(null);
   const [filterVerifiedOnly, setFilterVerifiedOnly] = useState(false);
   const [filterRecentlyUpdated, setFilterRecentlyUpdated] = useState(false);
+  const [showFilterModal, setShowFilterModal] = useState(false);
 
   // Results
   const [results, setResults] = useState<RankedOrganizationResult[]>([]);
@@ -53,7 +54,7 @@ export default function SearchScreen() {
       const data = await BloodService.searchBloodSources({
         bloodGroup,
         units,
-        maxDistanceKm: filterDistance,
+        maxDistanceKm: filterDistance || undefined,
         verifiedOnly: filterVerifiedOnly,
         recentlyUpdatedOnly: filterRecentlyUpdated,
       });
@@ -70,14 +71,15 @@ export default function SearchScreen() {
   }, [bloodGroup, units, filterDistance, filterVerifiedOnly, filterRecentlyUpdated]);
 
   const handleCall = (phone: string, orgName: string) => {
+    const targetPhone = phone || Config.emergencyHelpline;
     Alert.alert(
       "Confirm Availability",
-      `Call ${orgName} at ${phone} to confirm before travelling?`,
+      `Call ${orgName} at ${targetPhone} to confirm before travelling?`,
       [
         { text: "Cancel", style: "cancel" },
         {
           text: "Call Now",
-          onPress: () => Linking.openURL(`tel:${phone.replace(/\s+/g, "")}`),
+          onPress: () => Linking.openURL(`tel:${targetPhone.replace(/\s+/g, "")}`),
         },
       ]
     );

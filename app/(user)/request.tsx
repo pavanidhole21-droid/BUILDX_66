@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import Colors from '@/constants/colors';
+import Config from '@/constants/config';
 import { BloodGroup, ALL_BLOOD_GROUPS } from '@/types/blood';
 import { BloodService } from '@/services/api/bloodService';
 import { useAuth } from '@/lib/AuthContext';
@@ -90,7 +91,7 @@ export default function RequestBloodScreen() {
           </View>
           <Text style={styles.sectionLabel}>Contact Information</Text>
           <Input label="Contact Person" value={contactPerson} onChangeText={setContactPerson} placeholder="e.g. Rohit Sharma" leftIcon={<Ionicons name="person-outline" size={20} color={Colors.text.muted} />} />
-          <Input label="Contact Number" value={contactNumber} onChangeText={setContactNumber} placeholder="e.g. +91 9876543210" keyboardType="phone-pad" leftIcon={<Ionicons name="call-outline" size={20} color={Colors.text.muted} />} />
+          <Input label="Contact Number" value={contactNumber} onChangeText={setContactNumber} placeholder={`e.g. ${Config.emergencyHelplineFormatted}`} keyboardType="phone-pad" leftIcon={<Ionicons name="call-outline" size={20} color={Colors.text.muted} />} />
           <Text style={styles.sectionLabel}>Additional Note (optional)</Text>
           <Input label="Note" value={note} onChangeText={setNote} placeholder="Any additional information..." multiline />
           <Button title="Submit Request" onPress={handleSubmit} loading={loading} size="lg" fullWidth style={styles.submitBtn} />
