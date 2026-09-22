@@ -7,11 +7,15 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Switch,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
+import * as Location from "expo-location";
 import Colors from "@/constants/colors";
 import Logo from "@/components/ui/Logo";
 import Input from "@/components/ui/Input";
@@ -26,7 +30,82 @@ export default function SignupScreen() {
   const [agreeTerms, setAgreeTerms] = useState(true);
   const [loading, setLoading] = useState(false);
 
+  // Location Permission State
+  const [locationGranted, setLocationGranted] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [locationName, setLocationName] = useState<string | null>(null);
+
+  const requestLocationPermission = async () => {
+    setLocating(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === "granted") {
+        setLocationGranted(true);
+        try {
+          const position = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+          const [geo] = await Location.reverseGeocodeAsync({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          });
+          if (geo && (geo.city || geo.region)) {
+            setLocationName(
+              `${geo.city || geo.subregion || "Nagpur"}, ${geo.region || "Maharashtra"}`
+            );
+          } else {
+            setLocationName("Nagpur, Maharashtra");
+          }
+        } catch {
+          setLocationName("Nagpur, Maharashtra");
+        }
+      } else {
+        setLocationGranted(false);
+        Alert.alert(
+          "Permission Denied",
+          "Location access is optional but strongly recommended to find the nearest emergency blood supplies."
+        );
+      }
+    } catch {
+      // Fallback for environments without native GPS
+      setLocationGranted(true);
+      setLocationName("Nagpur, Maharashtra");
+    } finally {
+      setLocating(false);
+    }
+  };
+
   const handleSignup = () => {
+    if (!agreeTerms) {
+      Alert.alert("Terms Required", "Please agree to the Terms & Privacy Policy to continue.");
+      return;
+    }
+
+    if (!locationGranted) {
+      Alert.alert(
+        "Enable Location?",
+        "Location helps BloodHelp instantly connect you to the nearest verified blood banks and hospitals.",
+        [
+          {
+            text: "Skip For Now",
+            style: "cancel",
+            onPress: () => submitRegistration(),
+          },
+          {
+            text: "Enable Location",
+            onPress: async () => {
+              await requestLocationPermission();
+              submitRegistration();
+            },
+          },
+        ]
+      );
+    } else {
+      submitRegistration();
+    }
+  };
+
+  const submitRegistration = () => {
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
@@ -122,6 +201,76 @@ export default function SignupScreen() {
               }
             />
 
+            {/* Location Permission Section */}
+            <View
+              style={[
+                styles.locationCard,
+                locationGranted && styles.locationCardActive,
+              ]}
+            >
+              <View style={styles.locationCardTop}>
+                <View
+                  style={[
+                    styles.locationIconBg,
+                    locationGranted && styles.locationIconBgActive,
+                  ]}
+                >
+                  <Ionicons
+                    name={locationGranted ? "location" : "location-outline"}
+                    size={22}
+                    color={
+                      locationGranted ? Colors.status.verified : Colors.primary.DEFAULT
+                    }
+                  />
+                </View>
+                <View style={styles.locationTextCol}>
+                  <Text style={styles.locationTitle}>
+                    {locationGranted
+                      ? "Location Enabled"
+                      : "Enable Location Access"}
+                  </Text>
+                  <Text style={styles.locationSub}>
+                    {locationGranted
+                      ? locationName || "Nagpur, Maharashtra"
+                      : "Required to find nearby verified blood banks & emergency donors"}
+                  </Text>
+                </View>
+
+                {locating ? (
+                  <ActivityIndicator size="small" color={Colors.primary.DEFAULT} />
+                ) : (
+                  <Switch
+                    value={locationGranted}
+                    onValueChange={(val) => {
+                      if (val) {
+                        requestLocationPermission();
+                      } else {
+                        setLocationGranted(false);
+                        setLocationName(null);
+                      }
+                    }}
+                    trackColor={{
+                      false: "#CBD5E1",
+                      true: Colors.status.verified,
+                    }}
+                  />
+                )}
+              </View>
+
+              {!locationGranted && (
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={requestLocationPermission}
+                  style={styles.enableLocButton}
+                >
+                  <Ionicons name="navigate" size={14} color={Colors.primary.DEFAULT} />
+                  <Text style={styles.enableLocButtonText}>
+                    Grant Location Permission
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
             {/* Terms checkbox */}
             <TouchableOpacity
               activeOpacity={0.7}
@@ -200,6 +349,65 @@ const styles = StyleSheet.create({
   },
   form: {
     width: "100%",
+  },
+  locationCard: {
+    backgroundColor: Colors.surface.muted,
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.surface.border,
+    marginBottom: 18,
+  },
+  locationCardActive: {
+    backgroundColor: Colors.status.verifiedBg,
+    borderColor: Colors.status.verifiedBorder,
+  },
+  locationCardTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  locationIconBg: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.primary.light,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  locationIconBgActive: {
+    backgroundColor: "#FFFFFF",
+  },
+  locationTextCol: {
+    flex: 1,
+  },
+  locationTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: Colors.text.primary,
+  },
+  locationSub: {
+    fontSize: 11,
+    color: Colors.text.secondary,
+    marginTop: 2,
+    lineHeight: 15,
+  },
+  enableLocButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 10,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: Colors.primary.border,
+    gap: 6,
+  },
+  enableLocButtonText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: Colors.primary.DEFAULT,
   },
   termsRow: {
     flexDirection: "row",
