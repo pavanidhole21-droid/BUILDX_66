@@ -20,6 +20,12 @@ export const Config = {
     anonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "",
   },
 
+  googleSheet: {
+    id: process.env.EXPO_PUBLIC_GOOGLE_SHEET_ID || "16hqg2hqNV0dqeAFQif91SQa4PTDM6B3xHrARqTNO8EU",
+    url: "https://docs.google.com/spreadsheets/d/16hqg2hqNV0dqeAFQif91SQa4PTDM6B3xHrARqTNO8EU/edit?usp=sharing",
+    webhookUrl: process.env.EXPO_PUBLIC_GOOGLE_SHEET_WEBHOOK_URL || "",
+  },
+
   features: {
     enableMockData: true,
     enableEmergencySOS: true,

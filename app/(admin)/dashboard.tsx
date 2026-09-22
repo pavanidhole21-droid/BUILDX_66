@@ -13,9 +13,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import Colors from "@/constants/colors";
+import Config from "@/constants/config";
 import Header from "@/components/common/Header";
 import Badge from "@/components/ui/Badge";
 import { OrganizationService } from "@/services/api/organizationService";
+import { GoogleSheetsService } from "@/services/api/googleSheetsService";
 import { Organization } from "@/types/organization";
 
 export default function AdminDashboard() {
@@ -226,8 +228,30 @@ export default function AdminDashboard() {
               )}
 
               <TouchableOpacity
+                style={styles.sheetSyncBtn}
+                onPress={async () => {
+                  if (!Config.googleSheet.webhookUrl) {
+                    Alert.alert(
+                      "Google Sheet Webhook Required",
+                      `To sync directly to your Google Sheet:\n\n1. Open your sheet: ${Config.googleSheet.url}\n2. Go to Extensions -> Apps Script\n3. Paste the code from google_apps_script.js and Deploy as Web App\n4. Add the Web App URL to EXPO_PUBLIC_GOOGLE_SHEET_WEBHOOK_URL in .env`
+                    );
+                    return;
+                  }
+                  const res = await GoogleSheetsService.syncAllHospitals(orgs);
+                  if (res.success) {
+                    Alert.alert("Sync Successful", `Successfully synced ${orgs.length} hospitals and inventory to Google Sheet.`);
+                  } else {
+                    Alert.alert("Sync Failed", res.error);
+                  }
+                }}
+              >
+                <Ionicons name="document-text-outline" size={20} color="#16A34A" />
+                <Text style={styles.sheetSyncBtnText}>Sync to Google Sheet</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
                 style={styles.addOrgBtn}
-                onPress={() => Alert.alert("Add Organization", "Use Supabase dashboard to add new organizations and assign provider_user_id.")}
+                onPress={() => Alert.alert("Add Organization", "Use Supabase dashboard to add new organizations and assign provider_id.")}
               >
                 <Ionicons name="add-circle-outline" size={20} color={Colors.primary.DEFAULT} />
                 <Text style={styles.addOrgBtnText}>Add Organization</Text>
@@ -275,6 +299,8 @@ const styles = StyleSheet.create({
   verifyBtnActive: { borderColor: "#FECACA", backgroundColor: "#FEF2F2" },
   verifyBtnInactive: { borderColor: "#BBF7D0", backgroundColor: "#F0FDF4" },
   verifyBtnText: { fontSize: 12, fontWeight: "700" },
+  sheetSyncBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, marginTop: 8, borderRadius: 12, borderWidth: 1.5, borderColor: "#16A34A", backgroundColor: "#F0FDF4" },
+  sheetSyncBtnText: { fontSize: 14, fontWeight: "700", color: "#16A34A" },
   addOrgBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, marginTop: 8, borderRadius: 12, borderWidth: 1.5, borderStyle: "dashed", borderColor: Colors.primary.DEFAULT, backgroundColor: Colors.primary.lighter },
   addOrgBtnText: { fontSize: 14, fontWeight: "700", color: Colors.primary.DEFAULT },
 });
